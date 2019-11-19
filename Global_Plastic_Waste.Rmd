@@ -1,0 +1,152 @@
+
+
+# Global Plastic Waste  
+
+```{r,message=F}
+library(tidyverse)
+library(janitor)
+theme_set(theme_light())
+knitr::opts_chunk$set(message=F)
+```
+
+
+```{r}
+# loading
+coast_vs_waste <- read_csv("data/global_plastic_waste/coastal-population-vs-mismanaged-plastic.csv")
+mismanaged_vs_gdp <- read_csv("data/global_plastic_waste/per-capita-mismanaged-plastic-waste-vs-gdp-per-capita.csv")
+waste_vs_gdp <- read_csv("data/global_plastic_waste/per-capita-plastic-waste-vs-gdp-per-capita.csv")
+```
+
+
+Take a glance at the three datasets:   
+
+```{r}
+coast_vs_waste
+mismanaged_vs_gdp
+waste_vs_gdp
+```
+
+**Data dictionary**  
+
+
+`coast_vs_waste.csv`
+
+|variable             |class     |description |
+|:---|:---|:-----------|
+|Entity | Character | Country Name |
+| Code | Character | 3 Letter country code |
+| Year | Integer (date) | Year |
+| Mismanaged plastic waste (tonnes) | double | Tonnes of mismanaged plastic waste |
+| Coastal population | Double | Number of individuals living on/near coast |
+| Total Population | double | Total population according to Gapminder |
+
+
+ `mismanaged_vs_gdp.csv`
+
+|variable             |class     |description |
+|:---|:---|:-----------|
+|Entity | Character | Country Name |
+| Code | Character | 3 Letter country code |
+| Year | Integer (date) | Year |
+| Per capita mismanaged plastic waste (kg per day) | double | Amount of mismanaged plastic waste per capita in kg/day |
+| GDP per capita | Double | GDP per capita constant 2011 international $, rate  |
+| Total Population | double | Total population according to Gapminder |
+
+ `waste_vs_gdp.csv`
+
+|variable             |class     |description |
+|:---|:---|:-----------|
+|Entity | Character | Country Name |
+| Code | Character | 3 Letter country code |
+| Year | Integer (date) | Year |
+| Per capita plastic waste (kg per person per day) | double | Amount of  plastic waste per capita in kg/day |
+| GDP per capita | Double | GDP per capita constant 2011 international $, rate  |
+| Total Population | double | Total population according to Gapminder |
+
+
+We see from all these 3 datasets that:  
+
+* bad variable naming: use `janitor::clean_names` and then `rename` (for some names are still too long or hard to understand)  
+
+* large fraction of `NA`s:  
+
+```{r}
+coast_vs_waste %>%
+  summarize_all(~ mean(is.na(.)))
+```
+
+This is because they actually all contains data only from year 2010:  
+
+```{r}
+coast_vs_waste %>%
+  filter(!is.na(`Mismanaged plastic waste (tonnes)`)) %>%
+  count(Year)
+```
+
+
+```{r}
+mismanaged_vs_gdp %>% 
+  filter(!is.na(`Per capita mismanaged plastic waste (kilograms per person per day)`)) %>%
+  count(Year)
+```
+
+
+```{r}
+waste_vs_gdp %>% 
+  filter(!is.na(`Per capita plastic waste (kilograms per person per day)`)) %>%
+  count(Year)
+```
+
+* There are overlapping variables: `Entity`、`Code`、`Total Population` appears in all 3, with the first two variables allowing for the possibility of joining, and the last being redundant.  
+
+
+Here we could first define a function to do basic cleaning to all 3 datasets to avoid repetition:  
+
+```{r}
+clean_dataset <- function(tbl) {
+  tbl %>%
+    clean_names() %>%
+    filter(year == 2010) %>%
+    select(-year) %>%
+    rename(country = entity,
+           country_code = code)
+}
+```
+
+Then, join 3 datasets, delete redundant columns and continue renaming (this time using `select` instead of `rename`)
+
+```{r}
+coast_vs_waste %>%
+  clean_dataset() %>%
+  select(-total_population_gapminder) %>%
+  inner_join(clean_dataset(mismanaged_vs_gdp) %>%
+               select(-total_population_gapminder), by = c("country", "country_code")) %>%
+  inner_join(clean_dataset(waste_vs_gdp), by = c("country", "country_code")) %>% 
+  select(country, 
+         country_code,
+         mismanaged_waste = mismanaged_plastic_waste_tonnes,
+         coastal_population,
+         total_population = total_population_gapminder,
+         mismanaged_per_capita = per_capita_mismanaged_plastic_waste_kilograms_per_person_per_day,
+         gdp_per_capita = gdp_per_capita_ppp_constant_2011_international_constant_2011_international)
+```
+
+Since the [original article](https://ourworldindata.org/faq-on-plastics) focused largely on mismanaged waste and its influence, we'd better filter out any missing values in that variable:  
+
+```{r}
+plastic_waste <- coast_vs_waste %>%
+  clean_dataset() %>%
+  select(-total_population_gapminder) %>%
+  inner_join(clean_dataset(mismanaged_vs_gdp) %>%
+               select(-total_population_gapminder), by = c("country", "country_code")) %>%
+  inner_join(clean_dataset(waste_vs_gdp), by = c("country", "country_code")) %>% 
+  select(country, 
+         country_code,
+         mismanaged_waste = mismanaged_plastic_waste_tonnes,
+         coastal_population,
+         total_population = total_population_gapminder,
+         mismanaged_per_capita = per_capita_mismanaged_plastic_waste_kilograms_per_person_per_day,
+         gdp_per_capita = gdp_per_capita_ppp_constant_2011_international_constant_2011_international) %>%
+  filter(!is.na(mismanaged_per_capita))
+```
+

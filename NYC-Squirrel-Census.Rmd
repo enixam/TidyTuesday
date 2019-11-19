@@ -1,0 +1,121 @@
+
+
+# NYC Squirrel Census  
+
+```{r,echo=F}
+knitr::opts_chunk$set(message=F, warning = F)
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+
+
+Get the data:  
+
+```{r,message=F}
+nyc_squirrels <- read_csv("data/nyc_squirrels/nyc_squirrels.csv")
+```
+
+
+Take a quick look at its structure, variable types, observations, etc.  
+
+
+```{r}
+nyc_squirrels %>% 
+  glimpse()
+```
+
+A data dictionary could be found at:  
+https://github.com/rfordatascience/tidytuesday/tree/master/data/2019/2019-10-29  
+
+```{r}
+nyc_squirrels_small <- nyc_squirrels %>% 
+  select(long, lat, hectare, runs_from, ends_with("ing")) 
+```
+
+
+```{r}
+nyc_squirrels_small 
+```
+
+
+
+```{r}
+library(sf)
+central_park <- read_sf("data/nyc_squirrels/CentralPark.shx")
+
+ggplot(central_park) + 
+  geom_sf() + 
+  ggthemes::theme_map()
+```
+
+
+```{r,fig.height=8,fig.asp=0.8}
+library(rcartocolor)
+library(ggpointdensity)
+library(ggtext)
+
+ggplot(nyc_squirrels_small) +
+    geom_sf(data = central_park, color = "grey70") +
+    geom_point(aes(long, lat), size = 1.8, color = "grey55") +
+    ggpointdensity::geom_pointdensity(aes(long, lat),
+                                      adjust = 0.001,
+                                      size = 1.2) +
+    scale_x_continuous(limits = c(-73.982, -73.9495)) +
+    scale_y_continuous(limits = c(40.7648, 40.8)) +
+    rcartocolor::scale_color_carto_c(palette = "Sunset", 
+                                     direction = -1,
+                                     breaks = c(4, 44.5, 86),
+                                     labels = c("low", "**Clustering of Sightings →**", "high"),
+                                     name = "Squirrel Sightings\nin NYC's Central Park",
+                                     guide = guide_colorbar(direction = "horizontal",
+                                                            barheight = unit(3, units = "mm"), 
+                                                            barwidth = unit(100, units = "mm"),
+                                                            draw.ulim = FALSE, 
+                                                            ticks.colour = "transparent",
+                                                            title.position = 'top',
+                                                            title.hjust = 0.5, 
+                                                            label.hjust = 0.5)) +
+    
+    annotate("text", x = -73.9625, y = 40.786, 
+             label = "Jacqueline Kennedy\nOnassis Reservoir",
+             family = "Alice", fontface = "bold", 
+             color = "#2e85b0", size = 4.5) +  ## 580000 in combination with palette = "Burg"
+    labs(caption = "  Visualization by Cédric Scherer • Data: NYC Squirrel Census • Map: OpenStreetMap") +
+    theme(legend.position = c(0.295, 0.9))
+```
+
+
+
+
+
+```{r}
+nyc_squirrels_small %>% 
+  group_by(hectare) %>% 
+  add_tally() %>% 
+  group_by(hectare, n) %>% 
+  summarize_at(vars(long, lat), mean)
+```
+
+
+
+
+
+
+```{r}
+by_hectare <- nyc_squirrels %>%
+  add_count(hectare) %>% 
+  group_by(hectare, n) %>%
+  summarize_at(vars(long, lat, runs_from), mean)
+```
+
+
+
+
+
+
+
+

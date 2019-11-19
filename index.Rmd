@@ -1,0 +1,20 @@
+--- 
+title: 'Tidy Tuesday'
+author: "Maxine"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+always_allow_html: yes
+new_session: TRUE
+github-repo: enixam/TidyTuesday
+bibliography: bib.bib
+biblio-style: "apalike"
+link-citations: true
+--- 
+
+
+# Preface {-}  
+
+This project contains my codes and visualization practice of the [tidy tuesday project](https://github.com/rfordatascience/tidytuesday), some of which are borrowed from [David Robinson's screencast](https://www.youtube.com/channel/UCeiiqmVK07qhY-wvg3IZiZQ).   
+
+
