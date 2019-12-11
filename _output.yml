@@ -1,17 +1,16 @@
 bookdown::gitbook:
-  dev: svglite
   css: css/style.css
   config:
+    fontsettings:
+      theme: white
+      family: serif
+      size: 2
     toc:
-      collapse: none
+      collapse: section
       before: |
         <li><a href="./">Tidy Tuesday</a></li>
       after: |
-        <li><a href="https://bookdown.org" target="blank">written with bookdown</a></li>
-    toc_depth: 3
+        <li><a href="https://github.com/rstudio/bookdown" target="blank">Written with bookdown</a></li>
     edit:
-      link: https://github.com/enixam/TidyTuesday/edit/master/%s
+      link: https://github.com/enixam/TidyTuesday/edit/master/book/%s
       text: "Edit"
-
-
-

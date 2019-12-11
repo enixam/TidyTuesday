@@ -1,0 +1,15 @@
+book_filename: "bookdown-English"
+delete_merged_file: true
+
+rmd_files: [
+  "index.Rmd",
+  
+  "NYC-Squirrel-Census.Rmd",
+  "Global_Plastic_Waste.Rmd",
+  
+  "reference.Rmd"
+]
+
+language:
+  ui:
+    chapter_name: "Chapter "

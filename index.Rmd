@@ -4,12 +4,12 @@ author: "Maxine"
 date: "`r Sys.Date()`"
 site: bookdown::bookdown_site
 documentclass: book
-always_allow_html: yes
-new_session: TRUE
 github-repo: enixam/TidyTuesday
 bibliography: bib.bib
 biblio-style: "apalike"
 link-citations: true
+#notice: "@*"
+
 --- 
 
 
