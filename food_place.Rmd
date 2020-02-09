@@ -1,4 +1,5 @@
 
+# Food place
 
 ```{r}
 library(tidyverse)
@@ -7,18 +8,27 @@ library(glue)
 library(rvest)
 library(patchwork)
 library(ggtext)
+library(ggpomological)
+
+library(showtext)
+font_add_google("Homemade Apple", "apple")
+font_add_google("Sriracha")
+showtext_auto()
 ```
 
-# Scraping  
 
-```{r}
+
+## Scraping  
+
+
+```{r, cache = TRUE}
 url <- "https://thefoodplace.cafe/"
-source_page <- read_html(url)
+page_source <- read_html(url)
 ```
 
 
 ```{r}
-nodes <- source_page %>% 
+nodes <- page_source %>% 
   html_nodes("#cake .menu-item , #bottomless .menu-item , #theselection .menu-item , #brunch .menu-item , #soups .menu-item , .menu-item+ .menu-item , #entrees .menu-item , .menu-item:nth-child(1)")
 ```
 
@@ -44,8 +54,7 @@ food_place <- tibble(
   description = food_descriptions,
   season_episode = food_episodes,
 ) %>% 
-  separate(season_episode, into = c("season", "episode"), sep = "\\.") %>% 
-  na.omit()
+  separate(season_episode, into = c("season", "episode"), sep = "\\.")
 
 food_place
 ```
@@ -65,44 +74,120 @@ character <- c(
   "trevor"
 )
 
-characters <- tibble(
-  character = character,
-  src = glue("images/food_place/{character}.png"),
-  labels = glue("<img src='{src}' width='30'/> <br>{character}")
-)
+mean_img_color <- function(x) {
+  data <- png::readPNG(x)
+  color_freq <- names(sort(table(rgb(data[,,1], data[,,2], data[,,3])), 
+                           decreasing = TRUE))
+  setdiff(color_freq, c("#FFFFFF", "#000000", "#010101"))[1] # with janet fix
+}
 ```
 
 
 ```{r}
-words <- food_place %>% 
-  unnest_tokens(word, description) %>% 
+# characters <- tibble(
+#   character = character,
+#   src = glue("images/food_place/{character}.png"),
+#   color = map_chr(src, mean_img_color),
+#   labels = glue("<img src='{src}' width='30'/> <br>{character}")
+# )
+
+characters <- pins::pin_get("food_place_characters")
+```
+
+
+```{r}
+name_words <- food_place %>% 
+  unnest_tokens(word, name) %>% 
   anti_join(stop_words) %>% 
   mutate(word = str_replace(word, "’s", "")) %>% 
   count(word, sort = TRUE) %>% 
   mutate(type = if_else(word %in% character, "character", "food"))
 ```
 
-## character plot  
+## Character plot  
 
-```{r}
-words %>%
+```{r, cache = TRUE}
+character_words <- name_words %>%
   filter(type == "character") %>%
   left_join(characters, by = c("word" = "character")) %>%
-  mutate(word = str_to_title(word)) %>%
-  ggplot(aes(x = fct_reorder(word, n, .desc = TRUE), y = n)) +
-  geom_col() +
+  mutate(word = str_to_title(word))
+
+character_plot <- character_words %>%
+  ggplot(aes(x = fct_reorder(word, n, .desc = TRUE), y = n, fill = color)) +
+  geom_col() + 
   scale_fill_identity() +
-  scale_x_discrete(name = NULL, labels = labels) +
-  theme_minimal() +
+  scale_x_discrete(name = NULL, labels = characters$labels) +
+  theme_minimal() + 
+  theme_pomological(base_family = "apple") + 
   theme(
-    axis.text.x = element_markdown(lineheight = 1.2),
+    plot.title = element_text(size = 40, face = "bold"),
+    plot.title.position = "plot",
+    axis.text.x = element_markdown(lineheight = 1.2, size = 28),
     panel.grid.minor   = element_blank(),
     panel.grid.major.x = element_blank()
     ) +
   labs(
     y = "", 
-    title = "How often do character names appear on the menu?"
-    )
+    title = "Frequency of Character Names on the Mennu")
 
+ggsave("plots/food_place_characters.png", character_plot,
+       width = 8, height = 5)
+```
+
+## Food plot  
+
+```{r}
+food_words <- name_words %>% 
+  filter(type == "food") %>% 
+  top_n(15, wt = n)
+
+food_plot <- food_words %>% 
+  ggplot() + 
+  geom_col(aes(fct_reorder(word, n), n, fill = n)) + 
+  scale_fill_gradient(low = "#fef6b5", high = "#7c1d6f") + 
+  scale_y_continuous(expand = c(0, 0)) + 
+  coord_flip() + 
+  theme_pomological(base_family = "Sriracha") + 
+  theme(plot.title.position = "plot",
+        plot.title = element_text(size = 40),
+        axis.text.y = element_text(face = "bold", size = 22),
+        axis.text.x = element_text(size = 18),
+        panel.border = element_blank(),
+        legend.position = "none") + 
+  labs(title = "Most Common Words on the Menu",
+       x = "",
+       y = "")
+
+ggsave("plots/food_place_words.png", food_plot, width = 8, height = 5)
+```
+
+
+## Description analysis   
+
+```{r}
+sentiments <- get_sentiments("bing")
+```
+
+
+```{r}
+description_sentiment <- food_place %>% 
+  unnest_tokens(word, description) %>% 
+  anti_join(stop_words) %>%
+  inner_join(sentiments) 
+
+sentiment_plot <- description_sentiment %>% 
+  ggplot(aes(episode,  fill = sentiment)) + 
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("#00718b", "#c8586c")) + 
+  theme_minimal() + 
+  theme(plot.title = element_markdown(family = "Sriracha", size = 36),
+        axis.text.x = element_text(family = "apple", size = 28),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none") + 
+  labs(title = "<span style = 'color: #c8586c'>Positive</span> and <span style = 'color: #00718b'>Negative</span> Words Percentage Across Episodes")
+
+ggsave("plots/food_place_sentiment.png", sentiment_plot, width = 8, height = 5)
 ```
 
