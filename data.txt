@@ -1,0 +1,6 @@
+- path: food_place_html
+  name: food_place_html
+  type: default
+- path: food_place
+  name: food_place
+  type: default
