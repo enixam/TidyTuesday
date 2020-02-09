@@ -53,7 +53,7 @@ ggplot(central_park) +
 ```
 
 
-```{r,fig.height=8,fig.asp=0.8}
+```{r,fig.width = 10, fig.height = 8, fig.fullwidth = TRUE}
 library(rcartocolor)
 library(ggpointdensity)
 library(ggtext)

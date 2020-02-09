@@ -1,0 +1,108 @@
+
+
+```{r}
+library(tidyverse)
+library(tidytext)
+library(glue)
+library(rvest)
+library(patchwork)
+library(ggtext)
+```
+
+# Scraping  
+
+```{r}
+url <- "https://thefoodplace.cafe/"
+source_page <- read_html(url)
+```
+
+
+```{r}
+nodes <- source_page %>% 
+  html_nodes("#cake .menu-item , #bottomless .menu-item , #theselection .menu-item , #brunch .menu-item , #soups .menu-item , .menu-item+ .menu-item , #entrees .menu-item , .menu-item:nth-child(1)")
+```
+
+```{r}
+food_names <- nodes %>% 
+  html_node(".name") %>% 
+  html_text()
+
+food_episodes <- nodes %>%
+  html_node(".episode") %>% 
+  html_text()
+
+food_descriptions <- nodes %>% 
+  html_node(".description") %>%
+  html_text() %>% 
+  str_trim(side = "both")
+```
+
+
+```{r}
+food_place <- tibble(
+  name = food_names,
+  description = food_descriptions,
+  season_episode = food_episodes,
+) %>% 
+  separate(season_episode, into = c("season", "episode"), sep = "\\.") %>% 
+  na.omit()
+
+food_place
+```
+
+## pre
+
+```{r}
+character <- c(
+  "chidi",   
+  "eleanor",
+  "jason",
+  "derek",
+  "janet",
+  "tahani",
+  "michael",
+  "simone",
+  "trevor"
+)
+
+characters <- tibble(
+  character = character,
+  src = glue("images/food_place/{character}.png"),
+  labels = glue("<img src='{src}' width='30'/> <br>{character}")
+)
+```
+
+
+```{r}
+words <- food_place %>% 
+  unnest_tokens(word, description) %>% 
+  anti_join(stop_words) %>% 
+  mutate(word = str_replace(word, "’s", "")) %>% 
+  count(word, sort = TRUE) %>% 
+  mutate(type = if_else(word %in% character, "character", "food"))
+```
+
+## character plot  
+
+```{r}
+words %>%
+  filter(type == "character") %>%
+  left_join(characters, by = c("word" = "character")) %>%
+  mutate(word = str_to_title(word)) %>%
+  ggplot(aes(x = fct_reorder(word, n, .desc = TRUE), y = n)) +
+  geom_col() +
+  scale_fill_identity() +
+  scale_x_discrete(name = NULL, labels = labels) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_markdown(lineheight = 1.2),
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.x = element_blank()
+    ) +
+  labs(
+    y = "", 
+    title = "How often do character names appear on the menu?"
+    )
+
+```
+
