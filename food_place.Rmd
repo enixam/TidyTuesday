@@ -3,8 +3,9 @@
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
-
 # Food place
+
+Inspired by https://github.com/mine-cetinkaya-rundel/the-food-place  
 
 ```{r}
 library(tidyverse)
