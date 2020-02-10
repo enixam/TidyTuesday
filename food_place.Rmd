@@ -1,4 +1,9 @@
 
+```{r, echo = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+
 # Food place
 
 ```{r}
@@ -15,6 +20,7 @@ font_add_google("Homemade Apple", "apple")
 font_add_google("Sriracha")
 showtext_auto()
 ```
+
 
 
 
@@ -120,14 +126,16 @@ character_plot <- character_words %>%
   theme_minimal() + 
   theme_pomological(base_family = "apple") + 
   theme(
-    plot.title = element_text(size = 40, face = "bold"),
+    plot.title = element_text(size = 40, face = "bold", family = "Sriracha"),
     plot.title.position = "plot",
     axis.text.x = element_markdown(lineheight = 1.2, size = 28),
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 24, family = "Sriracha"),
     panel.grid.minor   = element_blank(),
-    panel.grid.major.x = element_blank()
+    panel.grid.major.x = element_blank(),
+    panel.border = element_blank(),
     ) +
   labs(
-    y = "", 
     title = "Frequency of Character Names on the Mennu")
 
 ggsave("plots/food_place_characters.png", character_plot,
@@ -164,30 +172,56 @@ ggsave("plots/food_place_words.png", food_plot, width = 8, height = 5)
 
 ## Description analysis   
 
-```{r}
-sentiments <- get_sentiments("bing")
-```
+
 
 
 ```{r}
 description_sentiment <- food_place %>% 
   unnest_tokens(word, description) %>% 
   anti_join(stop_words) %>%
-  inner_join(sentiments) 
+  inner_join(get_sentiments()) %>%
+  mutate(sent_type = if_else(value > 0, "postive", "negative")) %>%
+  group_by(episode, sent_type) %>% 
+  count(wt = value)
+
 
 sentiment_plot <- description_sentiment %>% 
-  ggplot(aes(episode,  fill = sentiment)) + 
-  geom_bar(position = "fill") +
+  ggplot() + 
+  geom_area(aes(episode, n, fill = sent_type, group = sent_type)) +
   scale_fill_manual(values = c("#00718b", "#c8586c")) + 
   theme_minimal() + 
-  theme(plot.title = element_markdown(family = "Sriracha", size = 36),
-        axis.text.x = element_text(family = "apple", size = 28),
+  theme_pomological(base_family = "Sriracha") + 
+  theme(
+        plot.title = element_markdown(size = 40),
+        plot.title.position = "plot",
+        panel.grid = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_text(size = 28),
+        axis.text.y = element_text(size = 24),
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        legend.position = "none") + 
-  labs(title = "<span style = 'color: #c8586c'>Positive</span> and <span style = 'color: #00718b'>Negative</span> Words Percentage Across Episodes")
+        legend.position = "none"
+        ) + 
+  labs(title = "<span style = 'color: #c8586c'>Positive</span> and <span style = 'color: #00718b'>Negative</span> Value Across Episodes")
 
-ggsave("plots/food_place_sentiment.png", sentiment_plot, width = 8, height = 5)
+ggsave("plots/food_place_sentiment.png", sentiment_plot, width = 8, height = 6)
 ```
+
+## Final plot  
+
+```{r}
+final_plot <- character_plot + food_plot / sentiment_plot + 
+  plot_annotation(
+    title = "Visualizing Food Place",
+    theme = theme(plot.title = element_text(family = "Sriracha", size = 60),
+                  plot.title.position = "plot")
+  )
+ggsave("plots/food_place_final.png", final_plot, width = 12, height = 6)
+```
+
+
+```{r, echo = FALsE}
+knitr::include_graphics("plots/food_place_final.png")
+```
+
 
