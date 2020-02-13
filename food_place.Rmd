@@ -37,9 +37,7 @@ page_source <- read_html(url)
 ```{r}
 nodes <- page_source %>% 
   html_nodes("#cake .menu-item , #bottomless .menu-item , #theselection .menu-item , #brunch .menu-item , #soups .menu-item , .menu-item+ .menu-item , #entrees .menu-item , .menu-item:nth-child(1)")
-```
 
-```{r}
 food_names <- nodes %>% 
   html_node(".name") %>% 
   html_text()
@@ -95,7 +93,7 @@ mean_img_color <- function(x) {
 #   character = character,
 #   src = glue("images/food_place/{character}.png"),
 #   color = map_chr(src, mean_img_color),
-#   labels = glue("<img src='{src}' width='30'/> <br>{character}")
+#   labels = glue("<img src='{src}' width='30'/> <br><span style = 'color: {color}'>{character}</span>")
 # )
 
 characters <- pins::pin_get("food_place_characters")
@@ -121,7 +119,7 @@ character_words <- name_words %>%
 
 character_plot <- character_words %>%
   ggplot(aes(x = fct_reorder(word, n, .desc = TRUE), y = n, fill = color)) +
-  geom_col() + 
+  geom_col(alpha = 0.8) + 
   scale_fill_identity() +
   scale_x_discrete(name = NULL, labels = characters$labels) +
   theme_minimal() + 
