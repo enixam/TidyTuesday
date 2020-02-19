@@ -1,0 +1,74 @@
+
+```{r}
+knitr::opts_chunk$set(message = F, warning = F)
+```
+
+
+```{r}
+# load fonts
+library(showtext)
+font_add_google("Fira Sans")
+showtext_auto()
+```
+
+
+```{r}
+library(tidyverse)
+library(countrycode)
+library(ggbeeswarm)
+
+
+student_ratio <- vroom::vroom("data/student_teacher_ratio/student_teacher_ratio.csv")
+
+# get country codes + continents information
+codes <- codelist %>%
+  select(iso3c, country.name.en, region, continent)
+
+# calculate summary statistics for each indicator and country
+data_summary <-
+  student_ratio %>%
+  group_by(indicator, country_code) %>%
+  summarize(mean = mean(student_ratio, na.rm = TRUE), 
+            median = median(student_ratio, na.rm = TRUE)) %>%
+  left_join(codes, by = c("country_code" = "iso3c")) %>%
+  filter(!is.na(continent), median < 75) %>%  # remove outlier
+  ungroup() %>% 
+  mutate(indicator = fct_relevel(indicator,
+                                 "Tertiary Education", 
+                                 "Post-Secondary Non-Tertiary Education",
+                                 "Upper Secondary Education", 
+                                 "Secondary Education", 
+                                 "Lower Secondary Education",
+                                 "Primary Education", 
+                                 "Pre-Primary Education"))
+
+
+
+ggplot(data_summary) +
+  geom_quasirandom(aes(x = indicator, y = median, color = continent), 
+                   alpha = 0.75, size = 2.5) +
+  coord_flip() +
+  scale_color_brewer(name = "", palette = "Set3") + 
+  theme_minimal(base_family = "Fira sans", base_size = 45) +
+  guides(colour = guide_legend(override.aes = list(size = 5, alpha = 1), 
+                               direction = "horizontal",
+                               label.hjust = -0.5)) +
+  labs(y = "Students assigned to one teacher", 
+       x = "",
+       title = "Poorer regions are suffering a dearth of teachers",
+       caption = "Student to teacher ratios worldwide, 2012 - 2016") +
+  theme(plot.background = element_rect(fill = "#F6FCF8"),
+        plot.title = element_text(size = 60, face = "bold", margin = margin(b = 0)),
+        plot.title.position = "plot",
+        legend.position = c(-0.06, 0.99),
+        legend.text = element_text(margin = margin(l = 0)),
+        legend.margin = margin(l = 0),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        plot.caption = element_text(face = "italic", vjust = 0.5, hjust = 1),
+        axis.title.x = element_text(margin = margin(t = 20)))
+
+ggsave("plots/student_teacher_ratio.png", device = "png", type = "cairo", 
+       height = 10, width = 12)
+```
+
