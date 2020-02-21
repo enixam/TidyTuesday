@@ -1,0 +1,98 @@
+
+# Replicate any plot in R  
+
+```{r}
+library(tidyverse)
+```
+
+
+
+## Homicides  
+
+```{r}
+library(ggtext)
+library(glue)
+
+
+countries <- c("US", "ITALY", "CANADA", "UK", "JAPAN", "GERMANY", "FRANCE", "RUSSIA")
+codes <- c("US", "IT", "CA", "GB", "JP", "DE", "FR", "RU")
+
+
+
+df <- tibble(country = countries,
+             code = codes,
+             src = glue("images/replicate/{code}.png"),
+             path = glue("<img src='{src}' width='33' height='22'/> <br><span>{country}</span>"),
+             count = c(3.2, 0.71, 0.5, 0.1, 0, 0.2, 0.1, 0),
+             label = c(as.character(c(3.2, 0.71, 0.5, 0.1, 0, 0.2, 0.1)), "No Data"))
+
+```
+
+
+```{r}
+homicides <- df %>% 
+  mutate(country = fct_reorder(country, count, .desc = TRUE)) %>%
+  ggplot(aes(country, count, label = label)) +
+  geom_bar(stat = "identity", fill = "darkred", color = "black") +
+  geom_text(nudge_y = 0.2, color = "darkred", size = 5) +
+  scale_x_discrete(labels = df$path) + 
+  scale_y_continuous(breaks = c(0, 1, 2, 3, 4), limits = c(0,4)) +   
+  geom_text(aes(6.25, 3.8, label = "Source UNODC Homicide Statistics")) + 
+  ggtitle(toupper("Homicide Per 100,000 in G-8 Countries")) + 
+  xlab("") + 
+  ylab("# of gun-related homicides\nper 100,000 people") +
+  ggthemes::theme_economist() +
+  theme(axis.text.x = element_markdown(),
+        axis.ticks.x = element_blank(),
+        axis.line.x = element_blank(),
+        plot.title.position = "plot",
+        plot.margin = unit(c(0.5,1,1,1), "cm"),
+        axis.title.y = element_text(margin = margin(r = 10)))
+
+ggsave("plots/homicides.png", width = 10, height = 6, device = "png", type = "cairo")
+```
+
+## Vaccine  
+
+The famous plot from Wall Street Journal  
+
+```{r}
+library(dslabs)
+library(scales)
+
+measles <- us_contagious_diseases %>% 
+  as_tibble() %>%
+  filter(state != "Hawaii", disease == "Measles") %>%
+  mutate(rate = count / population * 10000) # infecions per 10,000 people  
+
+jet.colors <- colorRampPalette(c("#F0FFFF", "cyan", "#007FFF", "yellow", "#FFBF00", "orange", "red", "#7F0000"), bias = 2.25)
+```
+
+
+```{r}
+measles_plot <- measles %>% 
+  mutate(state = fct_reorder(state, rate, .desc = TRUE)) %>%
+  ggplot(aes(year, state, fill = rate)) +
+  geom_tile(color = "white", size = 0.35) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_fill_gradientn(colors = jet.colors(16), na.value = 'white',
+                       breaks = breaks_extended(),
+                       name = "Infections per 100,000",
+                       guide = guide_colorbar(barwidth = 16,
+                                              title.position = "top",
+                                              )) +
+  geom_vline(xintercept = 1963, col = "black", size = 1.5) +
+  annotate(geom = "text", x = 1963, y = 46.5, label = "Vaccine introduced", size = 6, hjust = -0.1) + 
+  labs(title = "Measles", x = "", y = "") + 
+  coord_cartesian(clip = 'on') + 
+  theme_minimal() + 
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size = 15),
+        plot.title.position = "plot",
+        plot.title = element_text(size = 20))
+
+ggsave("plots/measles_plot.png", width = 14, height = 10, device = "png", type = "cairo")
+```
+
+

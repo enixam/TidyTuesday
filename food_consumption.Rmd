@@ -1,0 +1,64 @@
+
+# Food consumption  
+
+```{r}
+library(tidyverse)
+library(fuzzyjoin)
+library(waffle)
+library(hrbrthemes)
+library(pins)
+
+
+raw_data <- vroom::vroom(pin('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-02-18/food_consumption.csv')) 
+
+food_consumption <- raw_data %>% 
+    mutate(continent = countrycode(country,
+                                origin = "country.name",
+                                destination = "continent"))
+
+food_consumption
+```
+
+
+```{r}
+continent_plot <- food_consumption %>% 
+  group_by(continent, food_category) %>% 
+  summarize(total_food = sum(consumption)) %>% 
+  ggplot() + 
+  geom_waffle(aes(fill = food_category, values = total_food)) + 
+  facet_wrap(~ continent, nrow = 1)
+```
+
+Hong Kong
+
+```{r}
+population <- WDI(indicator = c(total_population = "SP.POP.TOTL"), 
+    start = 2018, end = 2018) %>% 
+  as_tibble() %>% 
+  select(-iso2c)
+```
+
+
+```{r}
+food_consumption_total <- food_consumption %>% 
+  left_join(population) %>% 
+  mutate(total_consumption = consumption * total_population,
+         total_emmission = co2_emmission * total_population)
+
+food_consumption_total
+```
+
+
+
+```{r}
+food_consumption_total %>% 
+  group_by(country, total_population, continent) %>% 
+  summarize(consumption = sum(consumption),
+            co2_emmission = sum(co2_emmission)) %>%
+  ggplot() +
+  geom_point(aes(consumption, co2_emmission, 
+                 fill = continent, size = total_population), shape = 21, color = "black") + 
+  scale_size(range = c(1, 20), guide = FALSE) + 
+  bbplot::bbc_style()
+```
+
