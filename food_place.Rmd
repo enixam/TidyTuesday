@@ -209,13 +209,16 @@ ggsave("plots/food_place_sentiment.png", sentiment_plot, width = 8, height = 6)
 ## Final plot  
 
 ```{r}
+
 final_plot <- character_plot + food_plot / sentiment_plot + 
   plot_annotation(
     title = "Visualizing Food Place",
     theme = theme(plot.title = element_text(family = "Sriracha", size = 60),
-                  plot.title.position = "plot")
-  )
-ggsave("plots/food_place_final.png", final_plot, width = 12, height = 6)
+                  plot.title.position = "plot",
+                  plot.background = element_rect(fill = "#fffeea")))
+
+ggsave("plots/food_place_final.png", width = 12, height = 6,
+       dev = "png", type = "cairo")
 ```
 
 
