@@ -1,0 +1,100 @@
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(wesanderson)
+```
+
+
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load(2020, week = 9)
+measles <- tuesdata$measles
+
+glimpse(measles)
+```
+
+`r nrow(measles)` rows school district level data about measles vaccination with a high proportion of missing values:   
+```{r}
+measles %>% summarize_all(~ mean(is.na(.x)))
+```
+
+Also, in the case of `mmr`, this data represent `NA` with -1, this accounts for 21956 rows.  
+
+```{r}
+measles %>% 
+  filter(mmr <= 0)
+```
+
+
+```{r}
+measles_df <- measles %>% 
+  filter(mmr > 0) %>% 
+  transmute(state, 
+            mmr_thereshold = case_when(
+              mmr > 95 ~ "Above",
+              TRUE ~ "Below")) %>% 
+  mutate(mmr_thereshold = factor(mmr_thereshold))
+```
+
+
+
+```{r}
+# proportion of schools that are above the threshhold in each state
+measles_df %>% 
+  group_by(state) %>% 
+  summarize(mmr = mean(mmr_thereshold == "Above")) %>%
+  mutate(state = fct_reorder(state, mmr)) %>% 
+  ggplot(aes(state, mmr, fill = state)) + 
+  coord_flip() + 
+  scale_y_continuous(labels = scales::label_percent()) + 
+  geom_col(show.legend = FALSE)
+```
+
+## Logistic regression 
+
+```{r}
+logistic_spec <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+fit <- logistic_spec %>%
+  fit(mmr_thereshold ~ state, data = measles_df)
+
+tidy(fit)
+```
+
+
+```{r}
+new_schools <- measles_df %>% 
+  distinct(state)
+
+mean_pred <- predict(fit,
+                     new_data = new_schools,
+                     type = "prob")
+
+conf_int <- predict(fit,
+                    new_data = new_schools,
+                    type = "conf_int")
+
+schools_result <- new_schools %>% 
+  bind_cols(mean_pred) %>% 
+  bind_cols(conf_int)
+```
+
+```{r}
+schools_result %>% 
+  mutate(state = fct_reorder(state, .pred_Above)) %>% 
+  ggplot(aes(state, .pred_Above, fill = state)) +
+  geom_col(show.legend = FALSE) + 
+  geom_errorbar(aes(ymin = .pred_lower_Above, 
+                    ymax = .pred_upper_Above)) + 
+  coord_flip() + 
+  scale_y_continuous(labels = scales::label_percent()) 
+  
+```
+
+
+
+## Trying another model  

@@ -1,0 +1,103 @@
+
+- draw a hex outline `st_union() + st_buffer()`  
+- breaks at a log scale: `scales::breaks_log()`
+- format number in text label `aes(label = scales::label_number_auto()(number))`
+
+```{r}
+library(tidyverse)
+library(vroom)
+library(sf)
+library(paletteer)
+library(scales)
+library(showtext)
+library(glue)
+library(ggtext)
+font_add_google("Fira Sans")
+showtext_auto()
+```
+
+
+```{r}
+covid <- vroom("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv") %>% 
+  filter(date == max(date))
+us_hex <- st_read("data/us-hex/HexStates.shp") %>%
+  st_transform(crs = 3395)
+
+us_hex_outline <- us_hex %>%
+  st_union() %>%
+  st_buffer(dist = 40000)
+```
+
+
+
+```{r}
+df <- us_hex %>% 
+  left_join(covid, by = c("state" = "state")) %>%
+  janitor::clean_names()
+```
+
+
+```{r}
+df %>%
+  ggplot() +
+  geom_sf(aes(fill = cases), size = 0.1, color = "white") +
+  geom_sf(
+    data = us_hex_outline,
+    color = "white",
+    fill = "transparent",
+    size = 1
+  ) +
+  geom_sf_text(
+    aes(label = state_abbr, color = cases > 3000),
+    size = 8,
+    fontface = "plain",
+    vjust = 2.5,
+  ) +
+  geom_sf_text(
+    aes(
+      label = label_number_auto()(cases),
+    ),
+    fontface = "bold",
+    size = 15
+  ) +
+  coord_sf(crs = 3395) +
+  scale_color_manual(guide = FALSE, values = c("black", "#E8E8E7")) + 
+  rcartocolor::scale_fill_carto_c(
+    palette = "Teal",
+    trans = "log10",
+    breaks = scales::log_breaks(n = 8)
+  ) +
+  guides(
+    fill = guide_colorbar(
+      barheight = unit(4, units = "mm"),
+      barwidth = unit(120, units = "mm"),
+      direction = "horizontal",
+      ticks.colour = "#3c3c3c",
+      title.position = "left",
+      title.hjust = 0.5,
+      label.theme = element_text(color = "white", size = 25),
+      title.theme = element_text(color = "white", size = 30),
+      title = "# of confirmed cases")) +
+  labs(
+    title = glue("Number of confirmed cases of covid-19 in the USA, updated on {Sys.Date()}"),
+    caption = "Source: New York Times") + 
+  cowplot::theme_nothing() +
+  theme(
+    text = element_text(family = "Fira Sans"),
+    legend.position = "None",
+    panel.background = element_rect(fill = "#887785", color = NA),
+    plot.background = element_rect(fill = "#887785"),
+    legend.background = element_rect(fill = "#887785", color = NA),
+    plot.title = element_text(color = "white", size = 75),
+    plot.title.position = "plot",
+    plot.caption = element_text(color = "white", size = 30, hjust = 1),
+)
+```
+
+
+```{r}
+ggsave("plots/us_covid.png", 
+       device = "png", type = "cairo",
+       width = 11.5, height = 10)
+```
+

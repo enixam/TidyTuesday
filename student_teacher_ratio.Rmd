@@ -45,9 +45,8 @@ data_summary <-
 
 
 ggplot(data_summary) +
-  geom_quasirandom(aes(x = indicator, y = median, color = continent), 
+  geom_quasirandom(aes(y = indicator, x = median, color = continent), 
                    alpha = 0.75, size = 2.5) +
-  coord_flip() +
   scale_color_brewer(name = "", palette = "Set3") + 
   theme_minimal(base_family = "Fira sans", base_size = 45) +
   guides(colour = guide_legend(override.aes = list(size = 5, alpha = 1), 

@@ -1,0 +1,195 @@
+
+```{r}
+library(tidyverse)
+library(pins)
+
+tuition_cost <- vroom::vroom(pin('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/tuition_cost.csv'))
+
+diversity_raw <- vroom::vroom(pin('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-10/diversity_school.csv'))
+
+theme_set(theme_light())
+```
+
+```{r}
+glimpse(tuition_cost)
+glimpse(diversity_raw)
+```
+
+```{r}
+diversity_raw %>% 
+  distinct(category)
+
+diversity_school <- diversity_raw %>% 
+  filter(category == "Total Minority") %>% 
+  mutate(total_minority = enrollment / total_enrollment)
+```
+
+
+```{r}
+diversity_school %>% 
+  ggplot(aes(total_minority)) + 
+  geom_histogram(alpha = 0.5)
+```
+
+
+```{r}
+# built-in R object that helps match state to its abbreviation, region, division, area
+tibble(
+  state.name,
+  state.abb,
+  state.region,
+  state.division,
+  state.area
+)
+
+
+university_df <- diversity_school %>% 
+  transmute(diversity = case_when(total_minority > 0.3 ~ "High",
+                                  TRUE ~ "low"),
+            name,
+            state, 
+            total_enrollment
+  ) %>% 
+  inner_join(tuition_cost) %>% 
+  select(state, 
+         type, 
+         degree_length, 
+         in_state_tuition:out_of_state_total, 
+         diversity) %>% 
+  left_join(tibble(state = state.name, region = state.region)) %>% 
+  select(-state) %>% 
+  mutate_at(vars(region, type, degree_length, diversity), factor) %>% 
+  select(region, everything())
+
+skimr::skim(university_df)
+```
+
+## Build models with recipes  
+
+```{r}
+library(tidymodels)
+
+set.seed(2020)
+uni_split <- initial_split(university_df)
+
+uni_training <- training(uni_split)
+uni_testing <- testing(uni_split)
+```
+
+```{r, message = TRUE}
+recipe(diversity ~ ., data = uni_training) %>% 
+  step_corr(all_numeric()) %>% 
+  step_dummy(all_nominal(), -all_outcomes()) %>% 
+  step_zv(all_numeric()) %>% 
+  step_normalize(all_numeric()) %>% 
+  prep(strings_as_factors = FALSE) %>% 
+  juice()
+
+uni_rec <- recipe(diversity ~ ., data = uni_training) %>% 
+  step_corr(all_numeric()) %>% 
+  step_dummy(all_nominal(), -all_outcomes()) %>% 
+  step_zv(all_numeric()) %>% 
+  step_normalize(all_numeric())
+```
+
+
+```{r}
+logistic_spec <- logistic_reg() %>% 
+  set_engine("glm")
+
+knn_spec <- nearest_neighbor() %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+
+tree_spec <- decision_tree() %>% 
+  set_engine("rpart") %>% 
+  set_mode("classification")
+
+uni_wf <- workflow() %>%
+  add_recipe(uni_rec)
+
+
+
+logistic_fit <- uni_wf %>%
+  add_model(logistic_spec) %>% 
+  fit(data = uni_training)
+
+logistic_fit %>% 
+  pull_workflow_fit() %>% 
+  tidy()
+
+knn_fit <- uni_wf %>% 
+  add_model(knn_spec) %>% 
+  fit(data = uni_training)
+
+tree_fit <- uni_wf %>% 
+  add_model(tree_spec) %>% 
+  fit(data = uni_training)
+```
+
+
+## Evaluate model with cross-validation  
+
+```{r}
+uni_folds <- vfold_cv(uni_training)
+uni_folds
+```
+
+```{r}
+logistic_cv <- uni_wf %>%
+  add_model(logistic_spec) %>% 
+  fit_resamples(resamples = uni_folds,
+                metrics = metric_set(roc_auc, sens, spec),
+                control = control_resamples(save_pred = TRUE)
+  )
+
+logistic_cv %>% unnest(.metrics)
+logistic_cv %>% unnest(.predictions)
+
+knn_cv <- uni_wf %>%
+  add_model(knn_spec) %>% 
+  fit_resamples(resamples = uni_folds,
+                metrics = metric_set(roc_auc, sens, spec),
+                control = control_resamples(save_pred = TRUE)
+  )
+
+tree_cv <- uni_wf %>%
+  add_model(tree_spec) %>% 
+  fit_resamples(resamples = uni_folds,
+                metrics = metric_set(roc_auc, sens, spec),
+                control = control_resamples(save_pred = TRUE)
+  )
+
+logistic_cv %>% 
+  collect_metrics() %>% 
+  mutate(model = "logistic") %>%
+  bind_rows(knn_cv %>% collect_metrics() %>% mutate(model = "knn")) %>% 
+  bind_rows(tree_cv %>% collect_metrics() %>% mutate(model = "tree"))
+
+
+
+logistic_cv %>% 
+  unnest(.predictions) %>% 
+  mutate(model = "logistic") %>%
+  bind_rows(knn_cv %>% unnest(.predictions) %>% mutate(model = "knn")) %>% 
+  bind_rows(tree_cv %>% unnest(.predictions) %>% mutate(model = "tree")) %>% 
+  group_by(model) %>% 
+  roc_curve(truth = diversity, .pred_High) %>% 
+  autoplot()
+```
+
+
+```{r}
+logistic_pred <- logistic_fit %>%
+  predict(new_data = uni_testing,
+          type = "prob") %>% 
+  mutate(truth = uni_testing$diversity)
+
+logistic_cv %>% collect_metrics()
+logistic_pred %>% roc_auc(truth = truth, .pred_High)
+
+logistic_pred %>% 
+  roc_curve(truth = truth, .pred_High) %>% 
+  autoplot()
+```
+
