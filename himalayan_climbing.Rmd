@@ -1,0 +1,92 @@
+
+
+
+```{r}
+library(tidyverse)
+library(scales)
+theme_set(theme_light())
+peaks <- readr::read_csv("https://raw.githubusercontent.com/tacookson/data/master/himalayan-expeditions/peaks.csv")
+expeditions <- readr::read_csv("https://raw.githubusercontent.com/tacookson/data/master/himalayan-expeditions/expeditions.csv")
+members <- readr::read_csv("https://raw.githubusercontent.com/tacookson/data/master/himalayan-expeditions/members.csv")
+```
+
+
+```{r}
+peaks %>% 
+  distinct(peak_name)
+```
+
+
+```{r}
+peaks %>% 
+  count(first_ascent_year) %>% 
+  ggplot(aes(first_ascent_year, n)) + 
+  geom_line() + 
+  scale_y_log10() 
+```
+
+
+
+```{r}
+ggplot(peaks) + 
+  geom_point(aes(first_ascent_year, height_metres))
+```
+
+
+```{r}
+peaks %>% 
+  filter(first_ascent_year == min(first_ascent_year, na.rm = TRUE))
+```
+
+```{r}
+peaks %>% 
+  filter(first_ascent_year != min(first_ascent_year, na.rm = TRUE),
+         !is.na(first_ascent_year)) -> peaks
+
+peaks %>% 
+  count(first_ascent_year) %>% 
+  ggplot(aes(first_ascent_year, n)) + 
+  geom_line() + 
+  scale_y_log10() 
+```
+
+
+# Map
+
+```{r}
+library(sf)
+library(countrycode)
+world <- spData::world
+
+countries <- peaks %>% 
+  transmute(country = first_ascent_country, 
+            year = first_ascent_year) %>% 
+  separate_rows(country, sep = ",") %>% 
+  mutate(country = str_trim(country),
+         country = fct_recode(country,
+                              "United States" = "USA",
+                              "Germany" = "W Germany",
+                              "United Kingdom" = "UK")) 
+
+
+
+map_df <-countries %>% 
+  count(country, name = "times") %>% 
+  left_join(world, by = c("country" = "name_long")) %>% 
+  st_as_sf()
+```
+
+
+```{r}
+library(tmap)
+tmap_mode("view")
+
+map_df %>% 
+  tm_shape() +
+  tm_fill(col = "times",
+          palette = "seq",
+          style = "log10_pretty") + 
+  tm_text("country", size = 1.2) + 
+  tm_layout(aes.palette = list(seq = "-RdYlGn"))
+```
+

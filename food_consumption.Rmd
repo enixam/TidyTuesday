@@ -62,3 +62,8 @@ food_consumption_total %>%
   bbplot::bbc_style()
 ```
 
+
+# twitter visualization  
+
+https://github.com/gkaramanis/tidytuesday/blob/master/2020-week08/food-consumption.R 
+

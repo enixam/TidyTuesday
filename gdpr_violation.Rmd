@@ -1,0 +1,5 @@
+
+
+# GDPR violation
+
+https://github.com/davidsjoberg/tidytuesday/blob/master/2020w17/2020w17_skript.R

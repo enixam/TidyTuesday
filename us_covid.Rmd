@@ -5,24 +5,22 @@
 
 ```{r}
 library(tidyverse)
-library(vroom)
 library(sf)
 library(paletteer)
 library(scales)
 library(showtext)
 library(glue)
 library(ggtext)
-font_add_google("Fira Sans")
+library(rcartocolor)
+font_add_google("ZCOOL QingKe HuangYou")
 showtext_auto()
 ```
 
 
 ```{r}
-covid <- vroom("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv") %>% 
-  filter(date == max(date))
+covid <- read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv") 
 us_hex <- st_read("data/us-hex/HexStates.shp") %>%
   st_transform(crs = 3395)
-
 us_hex_outline <- us_hex %>%
   st_union() %>%
   st_buffer(dist = 40000)
@@ -32,13 +30,15 @@ us_hex_outline <- us_hex %>%
 
 ```{r}
 df <- us_hex %>% 
-  left_join(covid, by = c("state" = "state")) %>%
+  left_join(covid, by = c("State" = "state")) %>%
   janitor::clean_names()
 ```
 
 
 ```{r}
-df %>%
+# static plot on 2020.04.08
+df %>% 
+  filter(date == max(date)) %>% 
   ggplot() +
   geom_sf(aes(fill = cases), size = 0.1, color = "white") +
   geom_sf(
@@ -49,20 +49,18 @@ df %>%
   ) +
   geom_sf_text(
     aes(label = state_abbr, color = cases > 3000),
-    size = 8,
+    size = 10,
     fontface = "plain",
-    vjust = 2.5,
+    vjust = 4,
   ) +
   geom_sf_text(
-    aes(
-      label = label_number_auto()(cases),
-    ),
+    aes(label = label_number_auto()(cases)),
     fontface = "bold",
     size = 15
   ) +
   coord_sf(crs = 3395) +
   scale_color_manual(guide = FALSE, values = c("black", "#E8E8E7")) + 
-  rcartocolor::scale_fill_carto_c(
+  scale_fill_carto_c(
     palette = "Teal",
     trans = "log10",
     breaks = scales::log_breaks(n = 8)
@@ -79,11 +77,11 @@ df %>%
       title.theme = element_text(color = "white", size = 30),
       title = "# of confirmed cases")) +
   labs(
-    title = glue("Number of confirmed cases of covid-19 in the USA, updated on {Sys.Date()}"),
-    caption = "Source: New York Times") + 
+    title = glue("美国新冠肺炎确诊人数, 更新于 {Sys.Date()}"),
+    caption = "数据: 纽约时报") + 
   cowplot::theme_nothing() +
   theme(
-    text = element_text(family = "Fira Sans"),
+    text = element_text(family = "ZCOOL QingKe HuangYou"),
     legend.position = "None",
     panel.background = element_rect(fill = "#887785", color = NA),
     plot.background = element_rect(fill = "#887785"),
@@ -99,5 +97,88 @@ df %>%
 ggsave("plots/us_covid.png", 
        device = "png", type = "cairo",
        width = 11.5, height = 10)
+```
+
+
+```{r}
+library(gganimate)
+
+# complete data 
+states <- df %>% expand(nesting(state, state_abbr, geometry))
+
+complete_df <- df %>%
+  complete(date, state, fill = list(cases = 0)) %>%
+  left_join(states, by = c("state")) %>% 
+  transmute(
+    date,
+    state,
+    state_abbr = state_abbr.y,
+    cases,
+    geometry = geometry.y
+    ) %>% 
+  st_as_sf()
+
+
+
+
+# gganimate plot
+  
+ggplot(complete_df) +
+  geom_sf(aes(fill = cases), size = 0.1, color = "white") +
+  geom_sf(
+    data = us_hex_outline,
+    color = "white",
+    fill = "transparent",
+    size = 1) +
+  geom_sf_text(
+    aes(label = state_abbr),
+    size = 10,
+    fontface = "plain",
+    vjust = 4) +
+  geom_sf_text(
+    aes(label = label_number_auto()(cases)),
+    fontface = "bold",
+    size = 15) +
+  coord_sf(crs = 3395) +
+  scale_fill_carto_c(
+    palette = "Teal",
+    trans = "log10",
+    breaks = scales::log_breaks(n = 8),
+    limits = c(0, max(complete_df$cases))
+  ) +
+  guides(
+    fill = guide_colorbar(
+      barheight = unit(4, units = "mm"),
+      barwidth = unit(120, units = "mm"),
+      direction = "horizontal",
+      ticks.colour = "#3c3c3c",
+      title.position = "left",
+      title.hjust = 0.5,
+      label.theme = element_text(color = "white", size = 25),
+      title.theme = element_text(color = "white", size = 30),
+      title = "# of confirmed cases")) +
+  labs(
+    title = "{closest_state}: Number of confirmed cases of covid-19 in the USA",
+    caption = "Source: New York Times") + 
+  cowplot::theme_nothing() +
+  theme(
+    text = element_text(family = "Fira Sans"),
+    legend.position = "None",
+    panel.background = element_rect(fill = "#887785", color = NA),
+    plot.background = element_rect(fill = "#887785"),
+    legend.background = element_rect(fill = "#887785", color = NA),
+    plot.title = element_text(color = "white", size = 75),
+    plot.title.position = "plot",
+    plot.caption = element_text(color = "white", size = 30, hjust = 1),
+) + 
+  transition_states(
+    states = date,
+    transition_length = 5,
+    state_length = c(rep(0.75, 69), 10),
+    wrap = FALSE
+  ) + 
+  enter_appear() + 
+  exit_fade()
+
 ```
 
